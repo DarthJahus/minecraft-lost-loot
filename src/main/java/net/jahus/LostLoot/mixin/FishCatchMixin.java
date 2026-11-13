@@ -1,7 +1,7 @@
-package me.TreeOfSelf.PandaArcheology.mixin;
-import me.TreeOfSelf.PandaArcheology.FindMessages;
-import me.TreeOfSelf.PandaArcheology.DespawnedItemManager;
-import me.TreeOfSelf.PandaArcheology.PandaArcheology;
+package net.jahus.LostLoot.mixin;
+import net.jahus.LostLoot.FindMessages;
+import net.jahus.LostLoot.DespawnedItemManager;
+import net.jahus.LostLoot.LostLoot;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.entity.projectile.FishingHook;
 import net.minecraft.world.item.ItemStack;
@@ -32,22 +32,22 @@ public abstract class FishCatchMixin {
 					target = "Lnet/minecraft/world/level/storage/loot/LootTable;getRandomItems(Lnet/minecraft/world/level/storage/loot/LootParams;)Lit/unimi/dsi/fastutil/objects/ObjectArrayList;"
 			)
 	)
-	private ObjectArrayList<ItemStack> pandaRedirectFishLoot(LootTable lootTable, LootParams params) {
+	private ObjectArrayList<ItemStack> RedirectFishLoot(LootTable lootTable, LootParams params) {
 		ObjectArrayList<ItemStack> items = lootTable.getRandomItems(params);
 		Player owner = this.getPlayerOwner();
-		if (!PandaArcheology.activeForFishing || owner == null || PandaArcheology.despawnedItemManager.itemLength() <= 0) {
+		if (!LostLoot.activeForFishing || owner == null || LostLoot.despawnedItemManager.itemLength() <= 0) {
 			return items;
 		}
 		if (!this.openWater) {
 			return items;
 		}
-		if (owner.level().getRandom().nextInt(PandaArcheology.fishingChance) - (this.luck + owner.getLuck()) * PandaArcheology.luckMultiplier > 0) {
+		if (owner.level().getRandom().nextInt(LostLoot.fishingChance) - (this.luck + owner.getLuck()) * LostLoot.luckMultiplier > 0) {
 			return items;
 		}
 		if (items.isEmpty()) {
 			return items;
 		}
-		DespawnedItemManager.itemData itemData = PandaArcheology.despawnedItemManager.getItem(owner.level().getRandom());
+		DespawnedItemManager.itemData itemData = LostLoot.despawnedItemManager.getItem(owner.level().getRandom());
 		FindMessages.announce(owner, itemData);
 		items.set(0, itemData.item);
 		return items;

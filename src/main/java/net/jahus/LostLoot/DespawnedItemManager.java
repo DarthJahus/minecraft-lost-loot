@@ -1,4 +1,4 @@
-package me.TreeOfSelf.PandaArcheology;
+package net.jahus.LostLoot;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
@@ -39,13 +39,13 @@ import java.util.Optional;
 
 
 public class DespawnedItemManager {
-    public static final Logger LOGGER = LoggerFactory.getLogger("pandaarcheology");
+    public static final Logger LOGGER = LoggerFactory.getLogger("LostLoot");
     private final List<ItemStack> despawnedItems = new ArrayList<>();
     private final List<String> despawnedItemsOwners = new ArrayList<>();
     private final List<Long> despawnedItemsTimes = new ArrayList<>();
 
     private static final ExecutorService WRITER = Executors.newSingleThreadExecutor(r -> {
-        Thread t = new Thread(r, "PandaArchaeology save");
+        Thread t = new Thread(r, "Lost-loot save");
         t.setDaemon(true);
         return t;
     });
@@ -54,7 +54,7 @@ public class DespawnedItemManager {
     private final HolderLookup.Provider registries;
 
     public DespawnedItemManager(Path worldSavePath, HolderLookup.Provider registries) {
-        this.dataFile = worldSavePath.resolve("despawned_items.dat");
+        this.dataFile = worldSavePath.resolve("LostLoot.dat");
         this.registries = registries;
         load();
     }
@@ -81,7 +81,7 @@ public class DespawnedItemManager {
             }
         }
 
-        if (PandaArcheology.itemLimit > 0 && occurrences >= PandaArcheology.itemLimit) {
+        if (LostLoot.itemLimit > 0 && occurrences >= LostLoot.itemLimit) {
             if (firstOccurrenceIndex != -1) {
                 LOGGER.info("Item limit reached for {}. Replacing the oldest instance.", item.getItem().toString());
                 despawnedItems.remove(firstOccurrenceIndex);
@@ -92,15 +92,15 @@ public class DespawnedItemManager {
         }
 
         if (!replaced) {
-            if (itemLength() >= PandaArcheology.globalItemLimit && PandaArcheology.globalItemLimit > 0) {
-                LOGGER.info("Met global item limit ({}). Removing oldest item to make room.", PandaArcheology.globalItemLimit);
+            if (itemLength() >= LostLoot.globalItemLimit && LostLoot.globalItemLimit > 0) {
+                LOGGER.info("Met global item limit ({}). Removing oldest item to make room.", LostLoot.globalItemLimit);
                 despawnedItems.removeFirst();
                 despawnedItemsOwners.removeFirst();
                 despawnedItemsTimes.removeFirst();
             }
         }
 
-        despawnedItems.add(item);
+        despawnedItems.add(item.copy());
         despawnedItemsOwners.add(nameString);
         despawnedItemsTimes.add(System.currentTimeMillis());
     }
@@ -283,7 +283,7 @@ public class DespawnedItemManager {
                         despawnedItemsTimes.add(0L);
                     }
                 } catch (Exception e) {
-                    PandaArcheology.LOGGER.info("Skipping despawned item at index {} due to error: {}", i, e.getMessage());
+                    LostLoot.LOGGER.info("Skipping despawned item at index {} due to error: {}", i, e.getMessage());
                 }
             }
 
@@ -296,7 +296,7 @@ public class DespawnedItemManager {
         public ItemStack item;
         public String owner;
         public long time;
-        public String dateFormated;
+        public String dateFormatted;
         public Component itemHoverName;
 
         itemData(ItemStack item, String owner, long time) {
@@ -305,7 +305,7 @@ public class DespawnedItemManager {
             this.time = time;
             LocalDateTime dateTime = LocalDateTime.ofInstant(
                     Instant.ofEpochMilli(time), ZoneId.systemDefault());
-            this.dateFormated = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            this.dateFormatted = dateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
             this.itemHoverName = FindMessages.itemHoverName(this.item);
         }
     }

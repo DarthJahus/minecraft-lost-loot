@@ -1,4 +1,4 @@
-package me.TreeOfSelf.PandaArcheology;
+package net.jahus.LostLoot;
 
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
@@ -57,19 +57,19 @@ public final class ItemFilter {
             if (s.startsWith("#")) {
                 Identifier id = Identifier.tryParse(s.substring(1));
                 if (id == null) {
-                    PandaArcheology.LOGGER.warn("[ItemFilter] Invalid tag id: {}", s);
+                    LostLoot.LOGGER.warn("[ItemFilter] Invalid tag id: {}", s);
                     continue;
                 }
                 tags.add(TagKey.create(Registries.ITEM, id));
             } else {
                 Identifier id = Identifier.tryParse(s);
                 if (id == null) {
-                    PandaArcheology.LOGGER.warn("[ItemFilter] Invalid item id: {}", s);
+                    LostLoot.LOGGER.warn("[ItemFilter] Invalid item id: {}", s);
                     continue;
                 }
                 Optional<Item> opt = BuiltInRegistries.ITEM.getOptional(id);
                 if (opt.isEmpty() || opt.get() == Items.AIR) {
-                    PandaArcheology.LOGGER.warn("[ItemFilter] Unknown item: {}", s);
+                    LostLoot.LOGGER.warn("[ItemFilter] Unknown item: {}", s);
                     continue;
                 }
                 items.add(opt.get());
@@ -78,7 +78,7 @@ public final class ItemFilter {
         resolvedItems = Set.copyOf(items);
         resolvedTags = List.copyOf(tags);
         resolved = true;
-        PandaArcheology.LOGGER.info("[ItemFilter] mode={} items={} tags={}",
+        LostLoot.LOGGER.info("[ItemFilter] mode={} items={} tags={}",
                 mode.configName(), resolvedItems.size(), resolvedTags.size());
     }
 

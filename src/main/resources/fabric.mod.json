@@ -1,26 +1,28 @@
 {
 	"schemaVersion": 1,
-	"id": "panda-archeology",
+	"id": "lost-loot",
 	"version": "${version}",
-	"name": "PandaArcheology",
-	"description": "This is an example description! Tell everyone what your mod is about!",
+	"name": "LostLoot",
+	"description": "Fish or brush despawned loot up!",
 	"authors": [
-		"TreeOfSelf"
+		"TreeOfSelf",
+		"Jahus"
 	],
 	"contact": {
-		"homepage": "",
-		"sources": ""
+		"homepage": "https://mc.jahus.net/projects",
+		"sources": "https://github.com/DarthJahus/minecraft-lost-loot",
+		"issues": "https://github.com/DarthJahus/minecraft-lost-loot/issues"
 	},
-	"license": "CC0-1.0",
-	"icon": "assets/panda-archeology/icon.png",
+	"license": "Apache-2.0",
+	"icon": "assets/lostloot/icon.png",
 	"environment": "*",
 	"entrypoints": {
 		"main": [
-          "me.TreeOfSelf.PandaArcheology.PandaArcheology"
+          "net.jahus.LostLoot.LostLoot"
 		]
 	},
 	"mixins": [
-		"panda-archeology.mixins.json"
+		"lost-loot.mixins.json"
 	],
 	"depends": {
 		"fabricloader": ">=0.18.6",

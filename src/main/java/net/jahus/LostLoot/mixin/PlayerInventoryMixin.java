@@ -1,4 +1,4 @@
-package me.TreeOfSelf.PandaArcheology.mixin;
+package net.jahus.LostLoot.mixin;
 
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Inventory;

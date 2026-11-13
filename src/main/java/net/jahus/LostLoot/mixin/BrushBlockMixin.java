@@ -1,7 +1,7 @@
-package me.TreeOfSelf.PandaArcheology.mixin;
-import me.TreeOfSelf.PandaArcheology.DespawnedItemManager;
-import me.TreeOfSelf.PandaArcheology.PandaArcheology;
-import me.TreeOfSelf.PandaArcheology.FindMessages;
+package net.jahus.LostLoot.mixin;
+import net.jahus.LostLoot.DespawnedItemManager;
+import net.jahus.LostLoot.LostLoot;
+import net.jahus.LostLoot.FindMessages;
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -24,17 +24,17 @@ public abstract class BrushBlockMixin {
 	private ItemStack item;
 
 	@Inject(method = "unpackLootTable", at = @At("TAIL"))
-	private void pandaAfterArchaeologyLoot(ServerLevel level, LivingEntity user, ItemInstance brush, CallbackInfo ci) {
+	private void AfterArchaeologyLoot(ServerLevel level, LivingEntity user, ItemInstance brush, CallbackInfo ci) {
 		if (!(user instanceof ServerPlayer player)) {
 			return;
 		}
 		if (this.item.isEmpty()) {
 			return;
 		}
-		if (PandaArcheology.activeForBrushing
-				&& PandaArcheology.despawnedItemManager.itemLength() > 0
-				&& player.level().getRandom().nextInt(PandaArcheology.brushChance) - (int) (player.getLuck() * PandaArcheology.luckMultiplier) <= 0) {
-			DespawnedItemManager.itemData itemData = PandaArcheology.despawnedItemManager.getItem(player.level().getRandom());
+		if (LostLoot.activeForBrushing
+				&& LostLoot.despawnedItemManager.itemLength() > 0
+				&& player.level().getRandom().nextInt(LostLoot.brushChance) - (int) (player.getLuck() * LostLoot.luckMultiplier) <= 0) {
+			DespawnedItemManager.itemData itemData = LostLoot.despawnedItemManager.getItem(player.level().getRandom());
 			FindMessages.announce(player, itemData);
 			this.item = itemData.item;
 			((BlockEntity) (Object) this).setChanged();

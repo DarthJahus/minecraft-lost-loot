@@ -1,35 +1,134 @@
-![image](https://github.com/user-attachments/assets/ba1a9b70-e39e-47fb-8d44-0bde5a982723)
+# LostLoot
 
-# PandaArchaeology
+Minecraft mod that saves despawned items in a server pool so players can **fish them up** or **brush them out** of suspicious sand/gravel.  
+With admin tools and optional filters and limits.
 
-## Description
+[![Modrinth](https://img.shields.io/modrinth/dt/jahus-lost-loot-upgraded?logo=modrinth&label=Modrinth)](https://modrinth.com/mod/jahus-lost-loot-upgraded)
+[![CurseForge](https://img.shields.io/curseforge/dt/1803244?logo=curseforge&label=CurseForge)](https://www.curseforge.com/projects/1803244)
 
-A fun mod to spice up a server. Fish up or brush up despawned loot! When loot despawns, it is added to a pool of items. Only 10 of each item type (configurable) can exist in this pool. When doing archeology or fishing, there is a chance (configurable) to find this despawned loot. It will display the date it was dropped and by who it was dropped if it was dropped by a player.
+Server-side / singleplayer. Clients do not need the mod.  
+Dependencies: Fabric API.
 
-## Configuring
+Based on [PandaArchaeology](https://github.com/TreeOfSelf/PandaArchaeology) by [TreeOfSelf](https://github.com/TreeOfSelf) (CC0).
 
-config/PandaArchaeology.json generated at runtime
+## Mechanics
 
-```
+- When an item entity **despawns**, it may be stored in a persistent pool (`LostLoot.dat` in the world folder).
+- **Fishing** (open water) and **archaeology** (suspicious sand/gravel) each have a configurable chance to pull an entry from that pool instead of (or as) the normal loot.
+- A message accompanies a find event. It shows the item (hover for enchants / components), who lost it (if known), and the date it was lost.
+
+## Config
+
+File: `config/lost-loot.json` (created/updated on first launch).
+
+```json
 {
-  "activeForFishing": true,      //Whether to activate for fishing
-  "activeForBrushing": true,     //Whether to activate for brushing
-  "onlyPlayerOwned": false,      //Only player dropped items will be added 
-  "itemLimit": 10,               //The max amount of any item type (set 0 to disable)
-  "fishingChance": 60,           //The 1 in x chance to find a despawned item when fishing 
-  "brushChance": 10              //The 1 in x chance to find a despawned item when brushing 
-  "luckMultiplier": 3            //How strongly luck improves your chances of discovery
+  "activeForFishing": true,
+  "activeForBrushing": true,
+  "onlyPlayerOwned": true,
+  "itemLimit": 10,
+  "globalItemLimit": 256,
+  "fishingChance": 100,
+  "brushChance": 10,
+  "luckMultiplier": 3,
+  "global_broadcast": false,
+  "item_filter_mode": "exclude",
+  "item_filter": [
+    "#minecraft:flowers",
+    "minecraft:dirt",
+    "minecraft:cobblestone",
+    "minecraft:kelp",
+    "minecraft:egg",
+    "minecraft:sand",
+    "minecraft:gravel"
+  ]
 }
 ```
 
-## Try it out
-`hardcoreanarchy.gay`   (Deathban Anarchy)  
-`sky.hardcoreanarchy.gay`   (Skyblock Anarchy)
+| Key                 | Default     | Meaning                                                                                         |
+|---------------------|-------------|-------------------------------------------------------------------------------------------------|
+| `activeForFishing`  | `true`      | Allow finds while fishing (open water only)                                                     |
+| `activeForBrushing` | `true`      | Allow finds when brushing suspicious blocks                                                     |
+| `onlyPlayerOwned`   | `true`      | Only store items that **had a player owner** (drops / death)                                    |
+| `itemLimit`         | `10`        | Max entries **per item type** (`0` = unlimited). FIFO: oldest of that type is removed when full |
+| `globalItemLimit`   | `256`       | Max entries **in the whole pool** (`0` = unlimited). FIFO: oldest overall is removed when full  |
+| `fishingChance`     | `100`       | `1 in N` base chance on a fishing catch (luck improves the roll)                                |
+| `brushChance`       | `10`        | `1 in N` base chance after archaeology loot is rolled                                           |
+| `luckMultiplier`    | `3`         | How strongly Luck of the Sea and the Luck effect improve the roll                               |
+| `global_broadcast`  | `false`     | `false`: message to finder only; `true`: whole server                                           |
+| `item_filter_mode`  | `exclude`   | `none`, `include`, `exclude` (see below)                                                        |
+| `item_filter`       | (see above) | Item ids (`minecraft:diamond`) and/or tags (`#minecraft:swords`)                                |
 
-## Support
+### Filter modes
 
-[Support discord here!]( https://discord.gg/3tP3Tqu983)
+- **`none`**: no id/tag filter (only `onlyPlayerOwned` applies)
+- **`exclude`**: store everything allowed by ownership **except** listed items
+- **`include`**: **only** listed items are added to the pool (still subject to `onlyPlayerOwned`)
+
+Filter is always applied **in addition** to `onlyPlayerOwned`.
+
+### Chances
+
+Rolls use `nextInt(N)` (values `0 … N-1`). A find succeeds when:
+
+```
+nextInt(N) ≤ effectiveLuck × luckMultiplier
+```
+
+- **Fishing:** `N = fishingChance`, `effectiveLuck = Luck of the Sea level + player Luck attribute`
+- **Brushing:** `N = brushChance`, `effectiveLuck = player Luck attribute` only (Luck of the Sea does not apply)
+
+With **defaults** (`fishingChance = 100`, `brushChance = 10`, `luckMultiplier = 3`):
+
+**Fishing**
+
+| Setup                        | effectiveLuck | Success chance     |
+|------------------------------|---------------|--------------------|
+| No luck                      | 0             | 1 / 100 (**1%**)   |
+| Luck of the Sea I            | 1             | 4 / 100 (**4%**)   |
+| Luck of the Sea II           | 2             | 7 / 100 (**7%**)   |
+| Luck of the Sea III          | 3             | 10 / 100 (**10%**) |
+| Luck of the Sea III + Luck I | 4             | 13 / 100 (**13%**) |
+
+**Brushing**
+
+| Setup    | effectiveLuck | Success chance     |
+|----------|---------------|--------------------|
+| No luck  | 0             | 1 / 10 (**10%**)   |
+| Luck I   | 1             | 4 / 10 (**40%**)   |
+| Luck II  | 2             | 7 / 10 (**70%**)   |
+| Luck III | 3             | 10 / 10 (**100%**) |
+
+If `effectiveLuck × luckMultiplier ≥ N`, the find is guaranteed (every successful open-water catch / brush roll).
+
+### Advice
+
+- Prefer `"onlyPlayerOwned": true`.
+- If using a filter, prefer `"item_filter_mode": "include"` and use [item tags](https://minecraft.wiki/w/Item_tag_(Java_Edition)) as much as possible.
+- Consider the social effects of `"global_broadcast": true` before enabling it.
+- Default brush rates climb quickly with Luck potions; raise `brushChance` or lower `luckMultiplier` if that feels too high.
+
+## Admin commands
+
+Permission: **game masters** (level 2).
+
+| Command                  | Description                                                                                                                            |
+|--------------------------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `/lostloot list`         | List the pool with **1-based** identifiers, hoverable item names, owner and date                                                       |
+| `/lostloot delete <id>`  | Delete one entry from the pool                                                                                                         |
+| `/lostloot clear`        | **Empty the pool**                                                                                                                     |
+| `/lostloot recover <id>` | Give that entry to the executing **player** inventory (does **not** drop; fails if inventory is full so nothing is lost from the pool) |
+
+Identifiers match `/lostloot list` (starting at `1`).
+
+## Persistence
+- Pool file: `<world>/LostLoot.dat` (NBT, atomic write via temp file).
+- Saved on vanilla autosave, clean shutdown, and after pool mutations (find, remove, clear, recover).
+- A hard crash between autosaves can lose **recently despawned** entries not yet flushed; finds that pull from the pool are saved promptly to avoid double-hold.
+
+## Credits
+- Original idea and base implementation: [@TreeOfSelf](https://github.com/TreeOfSelf) ([PandaArchaeology](https://github.com/TreeOfSelf/PandaArchaeology), CC0)
+- LostLoot fork and features: [@DarthJahus](https://github.com/DarthJahus)
 
 ## License
-
-[CC0](https://creativecommons.org/public-domain/cc0/)
+Apache-2.0

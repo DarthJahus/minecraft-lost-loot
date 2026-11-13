@@ -1,6 +1,6 @@
-package me.TreeOfSelf.PandaArcheology.mixin;
+package net.jahus.LostLoot.mixin;
 
-import me.TreeOfSelf.PandaArcheology.PandaArcheology;
+import net.jahus.LostLoot.LostLoot;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
@@ -28,10 +28,10 @@ public abstract class ItemEntityDespawn {
 		if (this.pickupDelay == 32767) {
 			return;
 		}
-		if (this.getOwner() != null || !PandaArcheology.onlyPlayerOwned) {
+		if (this.getOwner() != null || !LostLoot.onlyPlayerOwned) {
 			String nameString = "";
 			if (this.getOwner() != null) nameString = this.getOwner().getName().getString();
-			PandaArcheology.despawnedItemManager.addItem(this.getItem(), nameString);
+			LostLoot.despawnedItemManager.addItem(this.getItem(), nameString);
 		}
 	}
 }

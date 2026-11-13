@@ -1,4 +1,4 @@
-package me.TreeOfSelf.PandaArcheology;
+package net.jahus.LostLoot;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -28,7 +28,7 @@ public final class FindMessages {
 
     public static Component buildFindMessage(Player finder, DespawnedItemManager.itemData data) {
         MutableComponent msg = Component.literal("").withStyle(ChatFormatting.GRAY);
-        if (PandaArcheology.globalBroadcast) {
+        if (LostLoot.globalBroadcast) {
             msg.append(finder.getName().copy().withStyle(ChatFormatting.YELLOW));
             msg.append(Component.literal(" found "));
         } else {
@@ -41,14 +41,14 @@ public final class FindMessages {
             msg.append(Component.literal(data.owner).withStyle(ChatFormatting.YELLOW));
         }
         msg.append(Component.literal(" on "));
-        msg.append(Component.literal(data.dateFormated).withStyle(ChatFormatting.LIGHT_PURPLE));
+        msg.append(Component.literal(data.dateFormatted).withStyle(ChatFormatting.LIGHT_PURPLE));
         msg.append(Component.literal("."));
         return msg;
     }
 
     public static void announce(Player finder, DespawnedItemManager.itemData data) {
         Component message = buildFindMessage(finder, data);
-        if (PandaArcheology.globalBroadcast) {
+        if (LostLoot.globalBroadcast) {
             MinecraftServer server = finder.level().getServer();
             if (server != null) {
                 server.getPlayerList().broadcastSystemMessage(message, false);

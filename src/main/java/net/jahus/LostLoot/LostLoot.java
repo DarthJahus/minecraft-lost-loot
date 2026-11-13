@@ -1,4 +1,4 @@
-package me.TreeOfSelf.PandaArcheology;
+package net.jahus.LostLoot;
 
 import com.google.gson.*;
 import net.fabricmc.api.ModInitializer;
@@ -25,16 +25,16 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
-import me.TreeOfSelf.PandaArcheology.DespawnedItemManager.itemData;
+import net.jahus.LostLoot.DespawnedItemManager.itemData;
 
 import java.util.ArrayList;
 import java.util.List;
 
 
-public class PandaArcheology implements ModInitializer {
-    public static final Logger LOGGER = LoggerFactory.getLogger("pandaarcheology");
+public class LostLoot implements ModInitializer {
+    public static final Logger LOGGER = LoggerFactory.getLogger("LostLoot");
 	public static DespawnedItemManager despawnedItemManager;
-	private static final File CONFIG_FILE = new File("./config/PandaArchaeology.json");
+	private static final File CONFIG_FILE = new File("./config/lost-loot.json");
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 
 	public static boolean activeForFishing;
@@ -48,6 +48,7 @@ public class PandaArcheology implements ModInitializer {
 	public static boolean globalBroadcast;
 	private static List<String> defaultFilterEntries() {
 		return List.of(
+				"#minecraft:flowers",
 				"minecraft:dirt",
 				"minecraft:cobblestone",
 				"minecraft:kelp",
@@ -70,20 +71,20 @@ public class PandaArcheology implements ModInitializer {
 					.requires(Commands.hasPermission(Commands.LEVEL_GAMEMASTERS))
 
 						.then(Commands.literal("list")
-							.executes(PandaArcheology::listPool)
+							.executes(LostLoot::listPool)
 						)
 
-						.then(Commands.literal("remove")
+						.then(Commands.literal("delete")
 							.then(Commands.argument("id", IntegerArgumentType.integer())
 								.executes(context -> {
 									int id = context.getArgument("id", Integer.class);
-									return PandaArcheology.remItem(context, id-1);
+									return LostLoot.remItem(context, id-1);
 								})
 							)
 						)
 
 						.then(Commands.literal("clear")
-							.executes(PandaArcheology::clearPool)
+							.executes(LostLoot::clearPool)
 						)
 
 						.then(Commands.literal("recover")
@@ -95,13 +96,13 @@ public class PandaArcheology implements ModInitializer {
 										return 0;
 									}
 									int id = context.getArgument("id", Integer.class);
-									return PandaArcheology.recoverItem(context, id-1);
+									return LostLoot.recoverItem(context, id-1);
 								})
 							)
 						)
 			);
 		});
-		LOGGER.info("PandaArcheology Started!");
+		LOGGER.info("LostLoot Started!");
 	}
 
 	private void onServerSave(MinecraftServer server, boolean b, boolean b1) {
@@ -257,6 +258,8 @@ public class PandaArcheology implements ModInitializer {
 		brushChance = 10;
 		luckMultiplier = 3;
 		globalBroadcast = false;
+		ItemFilter.mode = ItemFilter.Mode.EXCLUDE;
+		ItemFilter.rawEntries = defaultFilterEntries();
 
 		saveConfig();
 		LOGGER.info("Created default configuration file.");
@@ -271,7 +274,7 @@ public class PandaArcheology implements ModInitializer {
 		}
 
 		if (id < 0 || id >= despawnedItemManager.itemLength()) {
-			source.sendFailure(Component.literal("Invalide item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(Component.literal("Invalid item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
 			return 0;
 		}
 
@@ -280,7 +283,7 @@ public class PandaArcheology implements ModInitializer {
 
 		itemData item = despawnedItemManager.getAt(id);
 		if (item == null) {
-			source.sendFailure(Component.literal("Invalide item at id %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(Component.literal("Invalid item at id %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
 			return 0;
 		}
 
@@ -311,7 +314,7 @@ public class PandaArcheology implements ModInitializer {
 			msg.append(Component.literal(" (lost by "));
 			msg.append(Component.literal(item.owner.isBlank() ? "unknown" : item.owner).withStyle(ChatFormatting.YELLOW));
 			msg.append(Component.literal(" on "));
-			msg.append(Component.literal(item.dateFormated).withStyle(ChatFormatting.LIGHT_PURPLE));
+			msg.append(Component.literal(item.dateFormatted).withStyle(ChatFormatting.LIGHT_PURPLE));
 			msg.append(Component.literal(") to "));
 			msg.append(Component.literal(player.getPlainTextName()).withStyle(ChatFormatting.GOLD));
 			msg.append(Component.literal(" from lost items pool."));
@@ -327,7 +330,7 @@ public class PandaArcheology implements ModInitializer {
 			msg.append(Component.literal(" (lost by "));
 			msg.append(Component.literal(item.owner.isBlank() ? "unknown" : item.owner).withStyle(ChatFormatting.YELLOW));
 			msg.append(Component.literal(" on "));
-			msg.append(Component.literal(item.dateFormated).withStyle(ChatFormatting.LIGHT_PURPLE));
+			msg.append(Component.literal(item.dateFormatted).withStyle(ChatFormatting.LIGHT_PURPLE));
 			msg.append(Component.literal(") to "));
 			msg.append(Component.literal(player.getPlainTextName()).withStyle(ChatFormatting.GOLD));
 			msg.append(Component.literal(". Free a slot up in the inventory."));
@@ -346,7 +349,7 @@ public class PandaArcheology implements ModInitializer {
 		}
 
 		if (id < 0 || id >= despawnedItemManager.itemLength()) {
-			source.sendFailure(Component.literal("Invalide item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(Component.literal("Invalid item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
 			return 0;
 		}
 
