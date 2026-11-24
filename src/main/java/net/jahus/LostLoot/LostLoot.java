@@ -29,8 +29,13 @@ import net.minecraft.world.item.Rarity;
 import net.jahus.LostLoot.DespawnedItemManager.itemData;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+
+import com.mojang.brigadier.arguments.StringArgumentType;
+import net.minecraft.network.chat.ClickEvent;
+import net.minecraft.network.chat.HoverEvent;
 
 
 public class LostLoot implements ModInitializer {
@@ -80,10 +85,10 @@ public class LostLoot implements ModInitializer {
 						)
 
 						.then(Commands.literal("delete")
-							.then(Commands.argument("id", IntegerArgumentType.integer())
+							.then(Commands.argument("id_list", StringArgumentType.greedyString())
 								.executes(context -> {
-									int id = context.getArgument("id", Integer.class);
-									return LostLoot.remItem(context, id-1);
+									String id_list = context.getArgument("id_list", String.class);
+									return LostLoot.remItems(context, id_list);
 								})
 							)
 						)
@@ -438,6 +443,92 @@ public class LostLoot implements ModInitializer {
 
 	}
 
+	private static int remItems(CommandContext<CommandSourceStack> ctx, String raw) {
+		CommandSourceStack source = ctx.getSource();
+
+		if (despawnedItemManager == null) {
+			source.sendFailure(Component.literal("Pool not loaded yet."));
+			return 0;
+		}
+
+		String[] parts = raw.split(",");
+		List<Integer> id_list = new ArrayList<>(); // 1-based, as typed by the operator
+		List<String> invalid = new ArrayList<>();
+
+		for (String part : parts) {
+			String token = part.strip();
+			if (token.isEmpty()) continue;
+			try {
+				int n = Integer.parseInt(token);
+				if (n <= 0) {
+					invalid.add(token);
+				} else {
+					id_list.add(n);
+				}
+			} catch (NumberFormatException e) {
+				invalid.add(token);
+			}
+		}
+
+		if (!invalid.isEmpty()) {
+			source.sendFailure(Component.literal(
+					"Invalid identifier%s: %s. Use positive integers only.".formatted(
+							invalid.size() == 1 ? "" : "s",
+							String.join(", ", invalid)
+					)
+			).withStyle(ChatFormatting.RED));
+			return 0;
+		}
+
+		if (id_list.isEmpty()) {
+			source.sendFailure(Component.literal("No valid id provided. Example: /lostloot delete 1,4,5")
+					.withStyle(ChatFormatting.RED));
+			return 0;
+		}
+
+		// Unique + sort descending (1-based) so removals don't shift lower indices
+		id_list = id_list.stream().distinct().sorted(Comparator.reverseOrder()).toList();
+
+		int removed = 0;
+		List<Integer> notFound = new ArrayList<>();
+
+		for (int oneBased : id_list) {
+			// ToDo: Consider condition where another admin changes the list during this loop
+
+			int zeroBased = oneBased - 1;
+
+			if (zeroBased < 0 || zeroBased >= despawnedItemManager.itemLength()) {
+				notFound.add(oneBased);
+				continue;
+			}
+
+			if (despawnedItemManager.removeAt(zeroBased, false)) {
+				removed++;
+			} else {
+				notFound.add(oneBased);
+			}
+		}
+
+		if (removed > 0) {
+			despawnedItemManager.saveAsync();
+		}
+
+		final String removedMsg = "Removed %d item%s from the lost loot pool.".formatted(removed, removed == 1 ? "" : "s");
+		if (removed > 0) {
+			source.sendSuccess(() -> Component.literal(removedMsg).withStyle(ChatFormatting.GREEN), true);
+		}
+		if (!notFound.isEmpty()) {
+			source.sendFailure(Component.literal(
+					"Could not remove identifier%s: %s. Use /lostloot list to see valid identifiers.".formatted(
+							notFound.size() == 1 ? "" : "s",
+							notFound.stream().sorted().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "))
+					)
+			).withStyle(ChatFormatting.RED));
+		}
+
+		return removed > 0 ? Command.SINGLE_SUCCESS : 0;
+	}
+
 	private static int clearPool(CommandContext<CommandSourceStack> ctx) {
 		CommandSourceStack source = ctx.getSource();
 
@@ -455,7 +546,8 @@ public class LostLoot implements ModInitializer {
         return Command.SINGLE_SUCCESS;
     }
 
-	private static final int LIST_PER_LINE = 1;
+	// ToDo: paginate / chunk when the pool is huge (hundreds/thousands of entries)
+	//  to avoid flooding the client with too many chat messages in one go.
 
 	private static int listPool(CommandContext<CommandSourceStack> ctx) {
 		CommandSourceStack source = ctx.getSource();
@@ -465,29 +557,44 @@ public class LostLoot implements ModInitializer {
 		}
 		List<DespawnedItemManager.itemData> pool = despawnedItemManager.snapshot();
 		if (pool.isEmpty()) {
-			source.sendSuccess(() -> Component.literal("Lost loot pool is empty.").withStyle(ChatFormatting.GRAY), false);
+			source.sendSuccess(() -> Component.literal("Lost loot pool is empty.")
+					.withStyle(ChatFormatting.GRAY), false);
 			return Command.SINGLE_SUCCESS;
 		}
 
 		source.sendSuccess(() -> Component.literal("Lost loot pool (%d):".formatted(pool.size()))
 				.withStyle(ChatFormatting.GOLD), false);
 
-		MutableComponent line = Component.literal("");
-		int onLine = 0;
 		for (int i = 0; i < pool.size(); i++) {
 			DespawnedItemManager.itemData data = pool.get(i);
-			if (onLine > 0) {
-				line.append(Component.literal(" · ").withStyle(ChatFormatting.DARK_GRAY));
-			}
-			line.append("[%02d] ".formatted(i+1)).withStyle(ChatFormatting.RED);
+			final int oneBased = i + 1;
+
+			MutableComponent line = Component.literal("");
+
+			// del: red, suggest delete element
+			line.append(Component.literal("del").withStyle(style -> style
+					.withColor(ChatFormatting.RED)
+					.withClickEvent(new ClickEvent.SuggestCommand("/lostloot delete " + oneBased))
+					.withHoverEvent(new HoverEvent.ShowText(
+							Component.literal("Suggest: /lostloot delete " + oneBased)))));
+
+			line.append(Component.literal(" "));
+
+			// rec: green, suggest recover element
+			line.append(Component.literal("rec").withStyle(style -> style
+					.withColor(ChatFormatting.GREEN)
+					.withClickEvent(new ClickEvent.SuggestCommand("/lostloot recover " + oneBased))
+					.withHoverEvent(new HoverEvent.ShowText(
+							Component.literal("Suggest: /lostloot recover " + oneBased)))));
+
+			line.append(Component.literal(" "));
+
+			// [id]
+			line.append(Component.literal("[%02d] ".formatted(oneBased)).withStyle(ChatFormatting.GOLD));
+
 			line.append(FindMessages.listEntry(data.item, data.owner, data.time));
-			onLine++;
-			if (onLine >= LIST_PER_LINE || i == pool.size() - 1) {
-				MutableComponent toSend = line;
-				source.sendSuccess(() -> toSend, false);
-				line = Component.literal("");
-				onLine = 0;
-			}
+
+			source.sendSuccess(() -> line, false);
 		}
 		return Command.SINGLE_SUCCESS;
 	}

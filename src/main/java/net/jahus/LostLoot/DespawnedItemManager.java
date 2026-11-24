@@ -106,12 +106,12 @@ public class DespawnedItemManager {
     }
 
     /**
-     * Deletes an item at a specified index.
+     * Deletes an item at a specified index with an option to save.
      * @param index id of the item to remove.
+     * @param save whether to trigger a save operation after removal.
      * @return true if suppression succeeds; false otherwise.
      */
-
-    public boolean removeAt(int index) {
+    public boolean removeAt(int index, boolean save) {
         if (index < 0 || index>=despawnedItems.size()) {
             return false;
         }
@@ -119,8 +119,17 @@ public class DespawnedItemManager {
         despawnedItemsOwners.remove(index);
         despawnedItemsTimes.remove(index);
 
-        saveAsync();
+        if (save) saveAsync();
         return true;
+    }
+
+    /**
+     * Deletes an item at a specified index. (Saves by default)
+     * @param index id of the item to remove.
+     * @return true if suppression succeeds; false otherwise.
+     */
+    public boolean removeAt(int index) {
+        return removeAt(index, true);
     }
 
     /**
@@ -180,7 +189,7 @@ public class DespawnedItemManager {
 
     // Copies the pool here and encodes on WRITER: encoding thousands of items on every find lagged the server thread.
     // Stack copies are cheap, and a later find can hand one of these stacks to a player while WRITER still encodes.
-    private void saveAsync() {
+    public void saveAsync() {
         List<ItemStack> items = new ArrayList<>(despawnedItems.size());
         for (ItemStack stack : despawnedItems) items.add(stack.copy());
         List<String> owners = new ArrayList<>(despawnedItemsOwners);
