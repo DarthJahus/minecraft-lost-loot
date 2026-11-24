@@ -32,6 +32,7 @@ File: `config/lost-loot.json` (created/updated on first launch).
   "brushChance": 10,
   "luckMultiplier": 3,
   "global_broadcast": false,
+  "min_rarity": "",
   "item_filter_mode": "exclude",
   "item_filter": [
     "#minecraft:flowers",
@@ -59,7 +60,31 @@ File: `config/lost-loot.json` (created/updated on first launch).
 | `item_filter_mode`  | `exclude`   | `none`, `include`, `exclude` (see below)                                                        |
 | `item_filter`       | (see above) | Item ids (`minecraft:diamond`) and/or tags (`#minecraft:swords`)                                |
 
-### Filter modes
+### Item filter and rarity
+
+Two layers, in this order:
+
+1. **`min_rarity`** (optional global floor)
+2. **`item_filter_mode` + `item_filter`** (include / exclude / none)
+
+#### `min_rarity`
+
+- Allowed values: `common`, `uncommon`, `rare`, `epic`, or empty / omitted to disable.
+- Compared with the item's effective rarity, including vanilla bumps from enchantments (enchanted gear is typically at least **rare**).
+- Evaluated **first**. Anything strictly below the floor is never stored, even if it matches the item filter.
+
+Examples:
+
+| `min_rarity` | Effect                                                                                                 |
+|--------------|--------------------------------------------------------------------------------------------------------|
+| *(empty)*    | No rarity gate (default).                                                                              |
+| `uncommon`   | Drops common items (white names) and keeps uncommon (yellow) and above                                 |
+| `rare`       | Keeps rare/epic items;<br/>In vanilla, most resources (`iron_ingot`, ores, etc.) are **filtered out**. |
+| `epic`       | Only epic items (and whatever the game reports as epic).                                               |
+
+Use a global floor when you want a **quality bar** for the whole pool. Prefer a wide **include** list (tags) when you care about **item types** more than name colour.
+
+#### Filter modes
 
 - **`none`**: no id/tag filter (only `onlyPlayerOwned` applies)
 - **`exclude`**: store everything allowed by ownership **except** listed items
@@ -107,6 +132,7 @@ If `effectiveLuck × luckMultiplier ≥ N`, the find is guaranteed (every succes
 - If using a filter, prefer `"item_filter_mode": "include"` and use [item tags](https://minecraft.wiki/w/Item_tag_(Java_Edition)) as much as possible.
 - Consider the social effects of `"global_broadcast": true` before enabling it.
 - Default brush rates climb quickly with Luck potions; raise `brushChance` or lower `luckMultiplier` if that feels too high.
+- Leave `min_rarity` empty unless you deliberately want to exclude common/uncommon loot.
 
 ## Admin commands
 
