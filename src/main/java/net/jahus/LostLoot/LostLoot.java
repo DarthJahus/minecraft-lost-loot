@@ -284,6 +284,27 @@ public class LostLoot implements ModInitializer {
 		return null;
 	}
 
+	public static MutableComponent suggestedCommand(String text, String command, ChatFormatting color) {
+		return Component.literal(text)
+			.withStyle(
+			style -> style
+				.withClickEvent(new ClickEvent.SuggestCommand(command))
+				.withColor(color)
+				.withHoverEvent(
+					new HoverEvent.ShowText(
+						Component.literal("Auto-type command:\n")
+							.append(
+									Component.literal(command).withStyle(s -> s.withColor(color))
+							)
+					)
+				)
+			);
+	}
+
+	public static MutableComponent suggestedCommand(String command, ChatFormatting color) {
+		return suggestedCommand(command, command, color);
+	}
+
 	private void saveConfig() {
 		JsonObject json = new JsonObject();
 		json.addProperty("activeForFishing", activeForFishing);
@@ -354,7 +375,11 @@ public class LostLoot implements ModInitializer {
 		}
 
 		if (id < 0 || id >= despawnedItemManager.itemLength()) {
-			source.sendFailure(Component.literal("Invalid item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(
+				Component.literal("Invalid item id: %d. Use ".formatted(id+1))
+					.append(suggestedCommand("/lostloot list", ChatFormatting.GOLD))
+					.append(Component.literal(" to see valid identifiers."))
+			);
 			return 0;
 		}
 
@@ -363,7 +388,11 @@ public class LostLoot implements ModInitializer {
 
 		itemData item = despawnedItemManager.getAt(id);
 		if (item == null) {
-			source.sendFailure(Component.literal("Invalid item at id %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(
+					Component.literal("Invalid item at id %d. Use ".formatted(id+1))
+							.append(suggestedCommand("/lostloot list", ChatFormatting.GOLD))
+							.append(Component.literal(" to see valid identifiers."))
+			);
 			return 0;
 		}
 
@@ -429,7 +458,11 @@ public class LostLoot implements ModInitializer {
 		}
 
 		if (id < 0 || id >= despawnedItemManager.itemLength()) {
-			source.sendFailure(Component.literal("Invalid item id: %d. Use /lostloot list to see valid identifiers.".formatted(id+1)));
+			source.sendFailure(
+				Component.literal("Invalid item id: %d. Use ".formatted(id+1))
+					.append(suggestedCommand("/lostloot list", ChatFormatting.GOLD))
+					.append(Component.literal(" to see valid identifiers."))
+			);
 			return 0;
 		}
 
@@ -519,11 +552,14 @@ public class LostLoot implements ModInitializer {
 		}
 		if (!notFound.isEmpty()) {
 			source.sendFailure(Component.literal(
-					"Could not remove identifier%s: %s. Use /lostloot list to see valid identifiers.".formatted(
+					"Could not remove identifier%s: %s. Use ".formatted(
 							notFound.size() == 1 ? "" : "s",
 							notFound.stream().sorted().map(String::valueOf).collect(java.util.stream.Collectors.joining(", "))
 					)
-			).withStyle(ChatFormatting.RED));
+				).withStyle(ChatFormatting.RED)
+					.append(suggestedCommand("/lostloot list", ChatFormatting.GOLD))
+					.append(" to see valid identifiers.").withStyle(ChatFormatting.RED)
+			);
 		}
 
 		return removed > 0 ? Command.SINGLE_SUCCESS : 0;
@@ -571,26 +607,16 @@ public class LostLoot implements ModInitializer {
 
 			MutableComponent line = Component.literal("");
 
-			// del: red, suggest delete element
-			line.append(Component.literal("del").withStyle(style -> style
-					.withColor(ChatFormatting.RED)
-					.withClickEvent(new ClickEvent.SuggestCommand("/lostloot delete " + oneBased))
-					.withHoverEvent(new HoverEvent.ShowText(
-							Component.literal("Suggest: /lostloot delete " + oneBased)))));
-
-			line.append(Component.literal(" "));
-
-			// rec: green, suggest recover element
-			line.append(Component.literal("rec").withStyle(style -> style
-					.withColor(ChatFormatting.GREEN)
-					.withClickEvent(new ClickEvent.SuggestCommand("/lostloot recover " + oneBased))
-					.withHoverEvent(new HoverEvent.ShowText(
-							Component.literal("Suggest: /lostloot recover " + oneBased)))));
-
-			line.append(Component.literal(" "));
-
 			// [id]
 			line.append(Component.literal("[%02d] ".formatted(oneBased)).withStyle(ChatFormatting.GOLD));
+
+			// rec: green, suggest recover element
+			line.append(suggestedCommand("♻", "/lostloot recover %d".formatted(oneBased), ChatFormatting.GREEN));
+
+			// del: red, suggest delete element
+			line.append(suggestedCommand("🗑", "/lostloot delete %d".formatted(oneBased), ChatFormatting.RED));
+
+			line.append(Component.literal(" "));
 
 			line.append(FindMessages.listEntry(data.item, data.owner, data.time));
 

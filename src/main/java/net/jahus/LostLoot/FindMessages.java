@@ -65,8 +65,13 @@ public final class FindMessages {
         String who = (owner == null || owner.isBlank()) ? "?" : owner;
 
         MutableComponent entry = Component.literal("");
+        entry.append(Component.literal(
+                "%s %-10.10s ".formatted(date, who)
+        ).withStyle(ChatFormatting.DARK_GRAY));
         entry.append(itemHoverName(stack));
-        entry.append(Component.literal(" (" + who + ", " + date + ")").withStyle(ChatFormatting.DARK_GRAY));
+        if (stack.getCount() != 1) {
+            entry.append(Component.literal(" ×%d".formatted(stack.getCount())).withStyle(ChatFormatting.GRAY));
+        }
         return entry;
     }
 }
