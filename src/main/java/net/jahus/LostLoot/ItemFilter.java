@@ -7,6 +7,7 @@ import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.item.Rarity;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -16,6 +17,20 @@ import java.util.Optional;
 import java.util.Set;
 
 public final class ItemFilter {
+
+    /**
+     * "" or invalid: Disable filter
+     */
+    public static Rarity parseRarity(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "common" -> Rarity.COMMON;
+            case "uncommon" -> Rarity.UNCOMMON;
+            case "rare" -> Rarity.RARE;
+            case "epic" -> Rarity.EPIC;
+            default -> null;
+        };
+    }
 
     public enum Mode {
         NONE, INCLUDE, EXCLUDE;
@@ -34,6 +49,7 @@ public final class ItemFilter {
         }
     }
 
+    public static Rarity minRarity = null;
     public static Mode mode = Mode.NONE;
     public static List<String> rawEntries = List.of();
 
@@ -84,20 +100,27 @@ public final class ItemFilter {
 
     public static boolean allows(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
-        if (mode == Mode.NONE) return true;
-        ensureResolved();
 
-        Item item = stack.getItem();
-        boolean matched = resolvedItems.contains(item);
-        if (!matched && !resolvedTags.isEmpty()) {
-            var holder = BuiltInRegistries.ITEM.wrapAsHolder(item);
-            for (TagKey<Item> tag : resolvedTags) {
-                if (holder.is(tag)) {
-                    matched = true;
-                    break;
+        // Rarity first (easiest)
+        if (minRarity != null && stack.getRarity().compareTo(minRarity) < 0) return false;
+
+        // Main filter
+        if (mode != Mode.NONE) {
+            ensureResolved();
+            Item item = stack.getItem();
+            boolean matched = resolvedItems.contains(item);
+            if (!matched && !resolvedTags.isEmpty()) {
+                var holder = BuiltInRegistries.ITEM.wrapAsHolder(item);
+                for (TagKey<Item> tag : resolvedTags) {
+                    if (holder.is(tag)) {
+                        matched = true;
+                        break;
+                    }
                 }
             }
+            return (mode == Mode.INCLUDE) == matched;  // because last condition
         }
-        return (mode == Mode.INCLUDE) == matched;
+
+        return true;
     }
 }

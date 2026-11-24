@@ -188,6 +188,13 @@ public class LostLoot implements ModInitializer {
 					needsUpdate = true;
 				}
 
+				String minRarity = null;
+				if (json.has("min_rarity")) {
+					minRarity = json.get("min_rarity").getAsString();
+				} else {
+					needsUpdate = true;
+				}
+
 				String filterMode = "exclude";
 				if (json.has("item_filter_mode")) {
 					filterMode = json.get("item_filter_mode").getAsString();
@@ -204,6 +211,8 @@ public class LostLoot implements ModInitializer {
 					filterEntries.addAll(defaultFilterEntries());
 					needsUpdate = true;
 				}
+
+				ItemFilter.minRarity = ItemFilter.parseRarity(minRarity);
 				ItemFilter.mode = ItemFilter.Mode.parse(filterMode);
 				ItemFilter.rawEntries = List.copyOf(filterEntries);
 				ItemFilter.invalidate();
@@ -234,6 +243,7 @@ public class LostLoot implements ModInitializer {
 		json.addProperty("brushChance", brushChance);
 		json.addProperty("luckMultiplier", luckMultiplier);
 		json.addProperty("global_broadcast", globalBroadcast);
+		json.addProperty("min_rarity", "");
 		json.addProperty("item_filter_mode", ItemFilter.mode.configName());
 		JsonArray filterArr = new JsonArray();
 		for (String entry : ItemFilter.rawEntries) filterArr.add(entry);
