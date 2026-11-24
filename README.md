@@ -32,7 +32,7 @@ File: `config/lost-loot.json` (created/updated on first launch).
   "brushChance": 10,
   "luckMultiplier": 3,
   "global_broadcast": false,
-  "min_rarity": "",
+  "rarity": [],
   "item_filter_mode": "exclude",
   "item_filter": [
     "#minecraft:flowers",
@@ -41,48 +41,42 @@ File: `config/lost-loot.json` (created/updated on first launch).
     "minecraft:kelp",
     "minecraft:egg",
     "minecraft:sand",
-    "minecraft:gravel"
+    "minecraft:gravel",
+    { "id": "minecraft:iron_axe", "rarity": ["common"] }
   ]
 }
 ```
 
-| Key                 | Default     | Meaning                                                                                         |
-|---------------------|-------------|-------------------------------------------------------------------------------------------------|
-| `activeForFishing`  | `true`      | Allow finds while fishing (open water only)                                                     |
-| `activeForBrushing` | `true`      | Allow finds when brushing suspicious blocks                                                     |
-| `onlyPlayerOwned`   | `true`      | Only store items that **had a player owner** (drops / death)                                    |
-| `itemLimit`         | `10`        | Max entries **per item type** (`0` = unlimited). FIFO: oldest of that type is removed when full |
-| `globalItemLimit`   | `256`       | Max entries **in the whole pool** (`0` = unlimited). FIFO: oldest overall is removed when full  |
-| `fishingChance`     | `100`       | `1 in N` base chance on a fishing catch (luck improves the roll)                                |
-| `brushChance`       | `10`        | `1 in N` base chance after archaeology loot is rolled                                           |
-| `luckMultiplier`    | `3`         | How strongly Luck of the Sea and the Luck effect improve the roll                               |
-| `global_broadcast`  | `false`     | `false`: message to finder only; `true`: whole server                                           |
-| `item_filter_mode`  | `exclude`   | `none`, `include`, `exclude` (see below)                                                        |
-| `item_filter`       | (see above) | Item ids (`minecraft:diamond`) and/or tags (`#minecraft:swords`)                                |
+| Key                 | Default     | Meaning                                                                                                  |
+|---------------------|-------------|----------------------------------------------------------------------------------------------------------|
+| `activeForFishing`  | `true`      | Allow finds while fishing (open water only)                                                              |
+| `activeForBrushing` | `true`      | Allow finds when brushing suspicious blocks                                                              |
+| `onlyPlayerOwned`   | `true`      | Only store items that **had a player owner** (drops / death)                                             |
+| `itemLimit`         | `10`        | Max entries **per item type** (`0` = unlimited). FIFO: oldest of that type is removed when full          |
+| `globalItemLimit`   | `256`       | Max entries **in the whole pool** (`0` = unlimited). FIFO: oldest overall is removed when full           |
+| `fishingChance`     | `100`       | `1 in N` base chance on a fishing catch (luck improves the roll)                                         |
+| `brushChance`       | `10`        | `1 in N` base chance after archaeology loot is rolled                                                    |
+| `luckMultiplier`    | `3`         | How strongly Luck of the Sea and the Luck effect improve the roll                                        |
+| `global_broadcast`  | `false`     | `false`: message to finder only; `true`: whole server                                                    |
+| `rarity`            | `[]`        | Global allow-list of item rarities (`common` / `uncommon` / `rare` / `epic`). Empty = no filter          |
+| `item_filter_mode`  | `exclude`   | `none`, `include`, `exclude` (see below)                                                                 |
+| `item_filter`       | (see above) | Strings (item id: `minecraft:dirt`, item tag: `#minecraft:flowers`)<br/>Objects `{ "id", "rarity": [] }` |
 
-### Item filter and rarity
+### Item filter, rarity and global rarity
 
 Two layers, in this order:
 
-1. **`min_rarity`** (optional global floor)
+1. **`rarity`** (optional global filter)
 2. **`item_filter_mode` + `item_filter`** (include / exclude / none)
 
-#### `min_rarity`
+#### Global `rarity`
 
-- Allowed values: `common`, `uncommon`, `rare`, `epic`, or empty / omitted to disable.
-- Compared with the item's effective rarity, including vanilla bumps from enchantments (enchanted gear is typically at least **rare**).
-- Evaluated **first**. Anything strictly below the floor is never stored, even if it matches the item filter.
+```json
+"rarity": ["rare", "epic"]
+```
 
-Examples:
-
-| `min_rarity` | Effect                                                                                                 |
-|--------------|--------------------------------------------------------------------------------------------------------|
-| *(empty)*    | No rarity gate (default).                                                                              |
-| `uncommon`   | Drops common items (white names) and keeps uncommon (yellow) and above                                 |
-| `rare`       | Keeps rare/epic items;<br/>In vanilla, most resources (`iron_ingot`, ores, etc.) are **filtered out**. |
-| `epic`       | Only epic items (and whatever the game reports as epic).                                               |
-
-Use a global floor when you want a **quality bar** for the whole pool. Prefer a wide **include** list (tags) when you care about **item types** more than name colour.
+Only rare and epic stacks may enter the pool.  
+`[]` or omit: no global rarity gate.
 
 #### Filter modes
 
@@ -91,6 +85,38 @@ Use a global floor when you want a **quality bar** for the whole pool. Prefer a 
 - **`include`**: **only** listed items are added to the pool (still subject to `onlyPlayerOwned`)
 
 Filter is always applied **in addition** to `onlyPlayerOwned`.
+
+#### `item_filter` entries
+
+| Form                                                 | Meaning                                                          |
+|------------------------------------------------------|------------------------------------------------------------------|
+| `"minecraft:dirt"`                                   | Match that item, **any** rarity                                  |
+| `"#minecraft:flowers"`                               | Match that tag, **any** rarity                                   |
+| `{ "id": "minecraft:iron_axe", "rarity": ["epic"] }` | Match only if id/tag matches **and** stack rarity is in the list |
+
+The same object form works in **include** and **exclude**: the `rarity` array restricts *when the rule matches*, it is not inverted by mode.
+
+Examples:
+
+- **Exclude** all flowers, and exclude only **common** iron axes:
+  ```json
+  "item_filter_mode": "exclude",
+  "item_filter": [
+    "#minecraft:flowers",
+    { "id": "minecraft:iron_axe", "rarity": ["common"] }
+  ]
+  ```
+- **Include** only epic iron axes and any diamond:
+  ```json
+  "item_filter_mode": "include",
+  "item_filter": [
+    "minecraft:diamond",
+    { "id": "minecraft:iron_axe", "rarity": ["epic"] }
+  ]
+  ```
+
+Old configs with `"min_rarity"` are migrated.  
+Example: `"rare"` is migrated to `"rarity": ["rare", "epic"]` (that floor and above).
 
 ### Chances
 
@@ -132,7 +158,7 @@ If `effectiveLuck × luckMultiplier ≥ N`, the find is guaranteed (every succes
 - If using a filter, prefer `"item_filter_mode": "include"` and use [item tags](https://minecraft.wiki/w/Item_tag_(Java_Edition)) as much as possible.
 - Consider the social effects of `"global_broadcast": true` before enabling it.
 - Default brush rates climb quickly with Luck potions; raise `brushChance` or lower `luckMultiplier` if that feels too high.
-- Leave `min_rarity` empty unless you deliberately want to exclude common/uncommon loot.
+- Leave `"rarity": []` unless you want a global quality gate; use per-entry `"rarity"` for exceptions (example: only rare axes).
 
 ## Admin commands
 

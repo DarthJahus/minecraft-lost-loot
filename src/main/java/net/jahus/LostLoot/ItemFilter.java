@@ -10,27 +10,27 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.item.Rarity;
 
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 
+/**
+ * Item / tag filter with optional per-rule and global rarity allow-lists.
+ *
+ * <p>Config shapes:
+ * <ul>
+ *   <li>{@code "rarity": ["uncommon", "epic"]} - global: stack rarity must be in the list
+ *       (empty / omitted = no global rarity gate)</li>
+ *   <li>{@code "item_filter": [ "minecraft:dirt", "#minecraft:flowers",
+ *       {"id": "minecraft:iron_axe", "rarity": ["epic"]} ]}</li>
+ * </ul>
+ *
+ * <p>A bare string matches any rarity. An object matches only if the stack rarity is
+ * listed (when {@code rarity} is non-empty). Include/exclude then applies to that match.
+ */
 public final class ItemFilter {
-
-    /**
-     * "" or invalid: Disable filter
-     */
-    public static Rarity parseRarity(String raw) {
-        if (raw == null || raw.isBlank()) return null;
-        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
-            case "common" -> Rarity.COMMON;
-            case "uncommon" -> Rarity.UNCOMMON;
-            case "rare" -> Rarity.RARE;
-            case "epic" -> Rarity.EPIC;
-            default -> null;
-        };
-    }
 
     public enum Mode {
         NONE, INCLUDE, EXCLUDE;
@@ -44,18 +44,56 @@ public final class ItemFilter {
             };
         }
 
-        String configName() {
+        public String configName() {
             return name().toLowerCase(Locale.ROOT);
         }
     }
 
-    public static Rarity minRarity = null;
-    public static Mode mode = Mode.NONE;
-    public static List<String> rawEntries = List.of();
+    /** One resolved filter rule (item or tag + optional rarity set). */
+    public static final class Rule {
+        /** Original config id, e.g. {@code minecraft:dirt} or {@code #minecraft:flowers}. */
+        public final String rawId;
+        public final Item item;                 // null if tag rule
+        public final TagKey<Item> tag;          // null if item rule
+        /** Empty = any rarity. */
+        public final Set<Rarity> rarities;
 
-    private static Set<Item> resolvedItems = Set.of();
-    private static List<TagKey<Item>> resolvedTags = List.of();
+        Rule(String rawId, Item item, TagKey<Item> tag, Set<Rarity> rarities) {
+            this.rawId = rawId;
+            this.item = item;
+            this.tag = tag;
+            this.rarities = rarities;
+        }
+
+        boolean isTag() {
+            return tag != null;
+        }
+    }
+
+    /** Empty = no global rarity gate. */
+    public static Set<Rarity> globalRarities = Set.of();
+    public static Mode mode = Mode.NONE;
+    /** Keep original JSON-ish entries for save (strings or structured). */
+    public static List<RawEntry> rawEntries = List.of();
+
+    private static List<Rule> resolvedRules = List.of();
     private static boolean resolved = false;
+
+    /** Unresolved config entry (string id or id + rarity list). */
+    public static final class RawEntry {
+        public final String id;
+        /** Empty = no per-entry rarity constraint. */
+        public final List<String> rarityNames;
+
+        public RawEntry(String id, List<String> rarityNames) {
+            this.id = id;
+            this.rarityNames = rarityNames == null ? List.of() : List.copyOf(rarityNames);
+        }
+
+        public static RawEntry ofId(String id) {
+            return new RawEntry(id, List.of());
+        }
+    }
 
     private ItemFilter() {}
 
@@ -63,20 +101,52 @@ public final class ItemFilter {
         resolved = false;
     }
 
+    /** Parse one rarity name; invalid → null. */
+    public static Rarity parseRarity(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        return switch (raw.trim().toLowerCase(Locale.ROOT)) {
+            case "common" -> Rarity.COMMON;
+            case "uncommon" -> Rarity.UNCOMMON;
+            case "rare" -> Rarity.RARE;
+            case "epic" -> Rarity.EPIC;
+            default -> null;
+        };
+    }
+
+    /** Parse a list of rarity names into a set; skips unknowns with a warning. */
+    public static Set<Rarity> parseRarityList(List<String> names) {
+        if (names == null || names.isEmpty()) return Set.of();
+        EnumSet<Rarity> set = EnumSet.noneOf(Rarity.class);
+        for (String name : names) {
+            Rarity r = parseRarity(name);
+            if (r == null) {
+                LostLoot.LOGGER.warn("[ItemFilter] Unknown rarity '{}', ignored", name);
+                continue;
+            }
+            set.add(r);
+        }
+        return set.isEmpty() ? Set.of() : Set.copyOf(set);
+    }
+
+    public static String rarityConfigName(Rarity r) {
+        return r.name().toLowerCase(Locale.ROOT);
+    }
+
     private static void ensureResolved() {
         if (resolved) return;
-        Set<Item> items = new HashSet<>();
-        List<TagKey<Item>> tags = new ArrayList<>();
-        for (String entry : rawEntries) {
-            if (entry == null || entry.isBlank()) continue;
-            String s = entry.trim();
+        List<Rule> rules = new ArrayList<>();
+        for (RawEntry entry : rawEntries) {
+            if (entry == null || entry.id == null || entry.id.isBlank()) continue;
+            String s = entry.id.trim();
+            Set<Rarity> rarities = parseRarityList(entry.rarityNames);
+
             if (s.startsWith("#")) {
                 Identifier id = Identifier.tryParse(s.substring(1));
                 if (id == null) {
                     LostLoot.LOGGER.warn("[ItemFilter] Invalid tag id: {}", s);
                     continue;
                 }
-                tags.add(TagKey.create(Registries.ITEM, id));
+                rules.add(new Rule(s, null, TagKey.create(Registries.ITEM, id), rarities));
             } else {
                 Identifier id = Identifier.tryParse(s);
                 if (id == null) {
@@ -88,39 +158,47 @@ public final class ItemFilter {
                     LostLoot.LOGGER.warn("[ItemFilter] Unknown item: {}", s);
                     continue;
                 }
-                items.add(opt.get());
+                rules.add(new Rule(s, opt.get(), null, rarities));
             }
         }
-        resolvedItems = Set.copyOf(items);
-        resolvedTags = List.copyOf(tags);
+        resolvedRules = List.copyOf(rules);
         resolved = true;
-        LostLoot.LOGGER.info("[ItemFilter] mode={} items={} tags={}",
-                mode.configName(), resolvedItems.size(), resolvedTags.size());
+        LostLoot.LOGGER.info("[ItemFilter] mode={} rules={} globalRarities={}",
+                mode.configName(), resolvedRules.size(), globalRarities.size());
+    }
+
+    private static boolean rarityOk(Set<Rarity> allowed, Rarity stackRarity) {
+        return allowed.isEmpty() || allowed.contains(stackRarity);
+    }
+
+    private static boolean ruleMatches(Rule rule, ItemStack stack) {
+        Item item = stack.getItem();
+        boolean idMatch;
+        if (rule.item != null) {
+            idMatch = rule.item == item;
+        } else {
+            idMatch = BuiltInRegistries.ITEM.wrapAsHolder(item).is(rule.tag);
+        }
+        if (!idMatch) return false;
+        return rarityOk(rule.rarities, stack.getRarity());
     }
 
     public static boolean allows(ItemStack stack) {
         if (stack == null || stack.isEmpty()) return false;
 
-        // Rarity first (easiest)
-        if (minRarity != null && stack.getRarity().compareTo(minRarity) < 0) return false;
+        // Global rarity allow-list first
+        if (!rarityOk(globalRarities, stack.getRarity())) return false;
 
-        // Main filter
-        if (mode != Mode.NONE) {
-            ensureResolved();
-            Item item = stack.getItem();
-            boolean matched = resolvedItems.contains(item);
-            if (!matched && !resolvedTags.isEmpty()) {
-                var holder = BuiltInRegistries.ITEM.wrapAsHolder(item);
-                for (TagKey<Item> tag : resolvedTags) {
-                    if (holder.is(tag)) {
-                        matched = true;
-                        break;
-                    }
-                }
+        if (mode == Mode.NONE) return true;
+
+        ensureResolved();
+        boolean matched = false;
+        for (Rule rule : resolvedRules) {
+            if (ruleMatches(rule, stack)) {
+                matched = true;
+                break;
             }
-            return (mode == Mode.INCLUDE) == matched;  // because last condition
         }
-
-        return true;
+        return (mode == Mode.INCLUDE) == matched;
     }
 }

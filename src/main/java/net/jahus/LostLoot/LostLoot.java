@@ -24,11 +24,13 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.world.item.Rarity;
 
 import net.jahus.LostLoot.DespawnedItemManager.itemData;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 
 public class LostLoot implements ModInitializer {
@@ -46,16 +48,19 @@ public class LostLoot implements ModInitializer {
 	public static int brushChance;
 	public static int luckMultiplier;
 	public static boolean globalBroadcast;
-	private static List<String> defaultFilterEntries() {
-		return List.of(
-				"#minecraft:flowers",
-				"minecraft:dirt",
-				"minecraft:cobblestone",
-				"minecraft:kelp",
-				"minecraft:egg",
-				"minecraft:sand",
-				"minecraft:gravel"
-		);
+	private static List<ItemFilter.RawEntry> defaultFilterEntries() {
+		List<ItemFilter.RawEntry> list = new ArrayList<>();
+		// Plain ids/tags: any rarity
+		list.add(ItemFilter.RawEntry.ofId("#minecraft:flowers"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:dirt"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:cobblestone"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:kelp"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:egg"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:sand"));
+		list.add(ItemFilter.RawEntry.ofId("minecraft:gravel"));
+		// Example object entry: only common iron axes (document the format in default config)
+		list.add(new ItemFilter.RawEntry("minecraft:iron_axe", List.of("common")));
+		return list;
 	}
 
 	@Override
@@ -188,9 +193,25 @@ public class LostLoot implements ModInitializer {
 					needsUpdate = true;
 				}
 
-				String minRarity = null;
-				if (json.has("min_rarity")) {
-					minRarity = json.get("min_rarity").getAsString();
+				// Global rarity allow-list (replaces min_rarity)
+				List<String> globalRarityNames = new ArrayList<>();
+				if (json.has("rarity") && json.get("rarity").isJsonArray()) {
+					for (JsonElement el : json.getAsJsonArray("rarity")) {
+						if (el.isJsonPrimitive()) globalRarityNames.add(el.getAsString());
+					}
+				} else if (json.has("min_rarity") && json.get("min_rarity").isJsonPrimitive()) {
+					// Migrate old min_rarity floor to allow-list of that rarity and above
+					String minRaw = json.get("min_rarity").getAsString();
+					Rarity floor = ItemFilter.parseRarity(minRaw);
+					if (floor != null) {
+						for (Rarity r : Rarity.values()) {
+							if (r.compareTo(floor) >= 0) {
+								globalRarityNames.add(ItemFilter.rarityConfigName(r));
+							}
+						}
+						LOGGER.info("Migrated min_rarity={} to rarity={}", minRaw, globalRarityNames);
+					}
+					needsUpdate = true;
 				} else {
 					needsUpdate = true;
 				}
@@ -202,17 +223,18 @@ public class LostLoot implements ModInitializer {
 					needsUpdate = true;
 				}
 
-				List<String> filterEntries = new ArrayList<>();
+				List<ItemFilter.RawEntry> filterEntries = new ArrayList<>();
 				if (json.has("item_filter") && json.get("item_filter").isJsonArray()) {
 					for (JsonElement el : json.getAsJsonArray("item_filter")) {
-						if (el.isJsonPrimitive()) filterEntries.add(el.getAsString());
+						ItemFilter.RawEntry parsed = parseFilterEntry(el);
+						if (parsed != null) filterEntries.add(parsed);
 					}
 				} else {
 					filterEntries.addAll(defaultFilterEntries());
 					needsUpdate = true;
 				}
 
-				ItemFilter.minRarity = ItemFilter.parseRarity(minRarity);
+				ItemFilter.globalRarities = ItemFilter.parseRarityList(globalRarityNames);
 				ItemFilter.mode = ItemFilter.Mode.parse(filterMode);
 				ItemFilter.rawEntries = List.copyOf(filterEntries);
 				ItemFilter.invalidate();
@@ -232,6 +254,31 @@ public class LostLoot implements ModInitializer {
 		}
 	}
 
+	private static ItemFilter.RawEntry parseFilterEntry(JsonElement el) {
+		if (el == null || el.isJsonNull()) return null;
+		if (el.isJsonPrimitive()) {
+			String id = el.getAsString();
+			return id == null || id.isBlank() ? null : ItemFilter.RawEntry.ofId(id);
+		}
+		if (el.isJsonObject()) {
+			JsonObject obj = el.getAsJsonObject();
+			if (!obj.has("id") || !obj.get("id").isJsonPrimitive()) {
+				LOGGER.warn("item_filter object without string id: {}", el);
+				return null;
+			}
+			String id = obj.get("id").getAsString();
+			List<String> rarities = new ArrayList<>();
+			if (obj.has("rarity") && obj.get("rarity").isJsonArray()) {
+				for (JsonElement r : obj.getAsJsonArray("rarity")) {
+					if (r.isJsonPrimitive()) rarities.add(r.getAsString());
+				}
+			}
+			return new ItemFilter.RawEntry(id, rarities);
+		}
+		LOGGER.warn("Unsupported item_filter entry: {}", el);
+		return null;
+	}
+
 	private void saveConfig() {
 		JsonObject json = new JsonObject();
 		json.addProperty("activeForFishing", activeForFishing);
@@ -243,10 +290,27 @@ public class LostLoot implements ModInitializer {
 		json.addProperty("brushChance", brushChance);
 		json.addProperty("luckMultiplier", luckMultiplier);
 		json.addProperty("global_broadcast", globalBroadcast);
-		json.addProperty("min_rarity", "");
+
+		JsonArray rarityArr = new JsonArray();
+		for (Rarity r : ItemFilter.globalRarities) {
+			rarityArr.add(ItemFilter.rarityConfigName(r));
+		}
+		json.add("rarity", rarityArr);
+
 		json.addProperty("item_filter_mode", ItemFilter.mode.configName());
 		JsonArray filterArr = new JsonArray();
-		for (String entry : ItemFilter.rawEntries) filterArr.add(entry);
+		for (ItemFilter.RawEntry entry : ItemFilter.rawEntries) {
+			if (entry.rarityNames.isEmpty()) {
+				filterArr.add(entry.id);
+			} else {
+				JsonObject obj = new JsonObject();
+				obj.addProperty("id", entry.id);
+				JsonArray rr = new JsonArray();
+				for (String name : entry.rarityNames) rr.add(name);
+				obj.add("rarity", rr);
+				filterArr.add(obj);
+			}
+		}
 		json.add("item_filter", filterArr);
 
 		CONFIG_FILE.getParentFile().mkdirs();
@@ -268,6 +332,7 @@ public class LostLoot implements ModInitializer {
 		brushChance = 10;
 		luckMultiplier = 3;
 		globalBroadcast = false;
+		ItemFilter.globalRarities = Set.of();
 		ItemFilter.mode = ItemFilter.Mode.EXCLUDE;
 		ItemFilter.rawEntries = defaultFilterEntries();
 
