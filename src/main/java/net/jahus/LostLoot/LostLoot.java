@@ -148,7 +148,7 @@ public class LostLoot implements ModInitializer {
 				if (json.has("onlyPlayerOwned")) {
 					onlyPlayerOwned = json.get("onlyPlayerOwned").getAsBoolean();
 				} else {
-					onlyPlayerOwned = false;
+					onlyPlayerOwned = true;
 					needsUpdate = true;
 				}
 
