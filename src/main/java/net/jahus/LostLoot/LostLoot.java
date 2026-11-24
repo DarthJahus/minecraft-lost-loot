@@ -413,7 +413,7 @@ public class LostLoot implements ModInitializer {
 			if (!despawnedItemManager.removeAt(id)) {
 				// the item has already been given, but the admin has to know that the deletion has failed
 				source.sendSuccess(() -> Component.literal("Failed to delete the given item (id %02d).".formatted(id+1)).withStyle(ChatFormatting.GRAY), false);
-			};
+			}
 
 			MutableComponent msg = Component.literal("").withStyle(ChatFormatting.GREEN);
 			msg.append(Component.literal("Gave item ["));

@@ -183,7 +183,7 @@ public class DespawnedItemManager {
         try {
             WRITER.submit(() -> write(compound)).get();
         } catch (Exception e) {
-            e.printStackTrace();
+            LOGGER.error(e.toString());
         }
     }
 
@@ -229,7 +229,7 @@ public class DespawnedItemManager {
             NbtIo.writeCompressed(compound, tmp);
             Files.move(tmp, dataFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (IOException e) {
-            e.printStackTrace();
+            LOGGER.error(e.toString());
         }
     }
 

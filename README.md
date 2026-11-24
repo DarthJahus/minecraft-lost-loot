@@ -19,7 +19,8 @@ Based on [PandaArchaeology](https://github.com/TreeOfSelf/PandaArchaeology) by [
 
 ## Config
 
-File: `config/lost-loot.json` (created/updated on first launch).
+File: `config/lost-loot.json` (created/updated on first launch).  
+Ready to use config: [lost-loot.json](lost-loot.json). Used on [Kabyle World](https://modrinth.com/server/kabyle-minecraft) server.
 
 ```json
 {
